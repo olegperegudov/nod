@@ -1,0 +1,32 @@
+[package]
+name = "nod"
+version = "0.1.0"
+description = "Tells you whether the Mac will fall asleep when you walk away"
+authors = ["Oleg Peregudov"]
+edition = "2021"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "nod_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api", "image-png"] }
+tauri-plugin-updater = "2"
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = "0.4"
+dirs = "6"
+tokio = { version = "1", features = ["time"] }
+
+[target.'cfg(unix)'.dependencies]
+# Quitting a holder is a SIGTERM to its pid — the same signal Cmd+Q sends, so
+# the app closes its documents instead of dying. No AppleScript, and therefore
+# no Automation permission to ask for.
+libc = "0.2"

@@ -1,0 +1,293 @@
+name: Build Nod
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # Auto-bump patch version, commit, and tag
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+      skipped: ${{ steps.bump.outputs.skipped }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 2
+
+      - name: Auto-bump version
+        id: bump
+        run: |
+          CURRENT=$(python3 -c "import json; print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
+          echo "Current version: $CURRENT"
+
+          # Already tagged: this is the bump commit coming back around.
+          if git describe --exact-match HEAD 2>/dev/null; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Commit already tagged, skipping"
+            exit 0
+          fi
+
+          # Second guard against the loop: the bot's own commit message.
+          LAST_MSG=$(git log -1 --pretty=%s)
+          if [[ "$LAST_MSG" == v* ]] || [[ "$LAST_MSG" == *"auto-bump"* ]]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Last commit was version bump, skipping"
+            exit 0
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=$((PATCH + 1))
+          NEW="$MAJOR.$MINOR.$PATCH"
+          TAG="v$NEW"
+          echo "Bumping to: $NEW"
+
+          python3 -c "
+          import json
+          f = 'src-tauri/tauri.conf.json'
+          d = json.load(open(f))
+          d['version'] = '$NEW'
+          json.dump(d, open(f, 'w'), indent=2)
+          print(f'Updated {f}')
+          "
+
+          sed -i "s/^version = \"$CURRENT\"/version = \"$NEW\"/" src-tauri/Cargo.toml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "$TAG auto-bump"
+          git tag "$TAG"
+          git push origin main "$TAG"
+
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "skipped=false" >> "$GITHUB_OUTPUT"
+
+  # JS unit tests before the build. Rust tests run inside the macOS job so we
+  # don't install a Rust toolchain on ubuntu just to compile the Tauri crate.
+  test:
+    needs: version
+    if: needs.version.outputs.skipped != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: JS unit tests (vitest)
+        run: npm test
+
+  # macOS only, and not by omission: Nod reads power assertions out of `pmset`.
+  # The Windows equivalent (`powercfg /requests`) needs an elevated prompt, which
+  # is the opposite of a utility that sits quietly in the tray.
+  build-macos:
+    needs: [version, test]
+    if: needs.version.outputs.skipped != 'true'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Rust unit tests
+        working-directory: src-tauri
+        # Absolute path — macos-latest has a `cargo` shim earlier in PATH that
+        # ignores rustup syntax; dtolnay installs the real cargo here.
+        shell: bash
+        run: "$HOME/.cargo/bin/cargo test --lib"
+
+      # A self-signed cert only counts as a *valid* codesigning identity once its
+      # root is trusted. Until then `security find-identity -v -p codesigning`
+      # omits it, codesign reports "no identity found", and Tauri's bundler dies
+      # with "failed to resolve signing identity". tauri-action's own
+      # APPLE_CERTIFICATE import does NOT add trust, so we build the keychain
+      # ourselves and trust the cert as a codeSign root (passwordless sudo on the
+      # runner → no GUI auth), then hand the bundler only APPLE_SIGNING_IDENTITY.
+      - name: Set up code-signing keychain (self-signed, trusted)
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/nod-signing.keychain-db"
+          KEYCHAIN_PWD="$(openssl rand -base64 24)"
+          P12="$RUNNER_TEMP/nod.p12"
+          CERT="$RUNNER_TEMP/nod-cert.pem"
+
+          printf '%s' "$APPLE_CERTIFICATE" | openssl base64 -d -A > "$P12"
+
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security import "$P12" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          # Let codesign use the private key without an interactive prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PWD" "$KEYCHAIN" >/dev/null
+
+          # Our keychain first on the search list so the bundler finds the key.
+          security list-keychains -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | tr -d '"')
+
+          security find-certificate -c "$APPLE_SIGNING_IDENTITY" -p "$KEYCHAIN" > "$CERT"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign \
+            -k /Library/Keychains/System.keychain "$CERT"
+
+          echo "Valid codesigning identities after trust:"
+          security find-identity -v -p codesigning
+          security find-identity -v -p codesigning | grep -q "$APPLE_SIGNING_IDENTITY" \
+            || { echo "::error::signing identity '$APPLE_SIGNING_IDENTITY' did not resolve"; exit 1; }
+
+      # Native per-arch builds, never a universal (lipo'd) bundle: a universal
+      # binary does not anchor macOS grants reliably, and the two steps run in
+      # order because tauri-action merges each platform key into the release's
+      # latest.json by read-modify-write — two uploads at once drop a key and
+      # strand half the users on an old version. Each upload can also fail on a
+      # transient GitHub API timeout, so each is repeated once from the warm cache.
+      - name: Build Tauri app (Apple Silicon)
+        id: build_arm
+        continue-on-error: true
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        with:
+          args: --target aarch64-apple-darwin --bundles app,dmg
+          tagName: ${{ needs.version.outputs.tag }}
+          releaseName: Nod ${{ needs.version.outputs.tag }}
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: false
+          prerelease: false
+
+      - name: Build Tauri app (Apple Silicon, retry)
+        if: steps.build_arm.outcome == 'failure'
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        with:
+          args: --target aarch64-apple-darwin --bundles app,dmg
+          tagName: ${{ needs.version.outputs.tag }}
+          releaseName: Nod ${{ needs.version.outputs.tag }}
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: false
+          prerelease: false
+
+      - name: Build Tauri app (Intel)
+        id: build_intel
+        continue-on-error: true
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        with:
+          args: --target x86_64-apple-darwin --bundles app,dmg
+          tagName: ${{ needs.version.outputs.tag }}
+          releaseName: Nod ${{ needs.version.outputs.tag }}
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: false
+          prerelease: false
+
+      - name: Build Tauri app (Intel, retry)
+        if: steps.build_intel.outcome == 'failure'
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        with:
+          args: --target x86_64-apple-darwin --bundles app,dmg
+          tagName: ${{ needs.version.outputs.tag }}
+          releaseName: Nod ${{ needs.version.outputs.tag }}
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: false
+          prerelease: false
+
+      # Stable, version-less copies for the README download buttons. Tauri's own
+      # asset names carry the version, so a direct link to them dies on the next
+      # bump — which is why those buttons used to dump people on the releases page.
+      - name: Publish stable-named macOS installers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          arm=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          intel=$(ls src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          cp "$arm" Nod_macOS_AppleSilicon.dmg
+          cp "$intel" Nod_macOS_Intel.dmg
+          gh release upload "$TAG" Nod_macOS_AppleSilicon.dmg Nod_macOS_Intel.dmg --clobber --repo "$GITHUB_REPOSITORY"
+
+      # The in-app updater is only as good as latest.json. Fetch the manifest we
+      # just published and fail the build if a platform key is missing or the
+      # version is wrong — a broken manifest must never ship silently.
+      - name: Verify updater manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p latest.json --clobber
+          python3 - "$TAG" <<'PY'
+          import json, sys
+          tag = sys.argv[1]
+          want = {"darwin-aarch64", "darwin-x86_64"}
+          m = json.load(open("latest.json"))
+          plats = m.get("platforms", {})
+          have = set(plats)
+          missing = want - have
+          if missing:
+              print(f"::error::latest.json missing platform keys: {sorted(missing)} (present: {sorted(have)})")
+              sys.exit(1)
+          if f"v{m.get('version')}" != tag:
+              print(f"::error::latest.json version {m.get('version')!r} != tag {tag!r}")
+              sys.exit(1)
+          for key in sorted(want):
+              url = plats[key].get("url", "")
+              if "universal" in url.lower():
+                  print(f"::error::{key} points at a universal bundle ({url.split('/')[-1]}); macOS must ship per-arch")
+                  sys.exit(1)
+          print(f"latest.json OK: version {m['version']}, platforms {sorted(have)}")
+          PY

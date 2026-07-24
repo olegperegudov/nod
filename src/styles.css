@@ -1,0 +1,168 @@
+/* The window is borderless and transparent, so this page *is* the app's skin.
+   Anything that scrolls, bounces or highlights like a browser reads as broken. */
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  color: #edf0fa;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Opaque on purpose: the popover floats over whatever is on screen, and text at
+   72% over someone's wallpaper is unreadable. */
+/* Height comes from the content — the window is then resized to match, so the
+   sheet always fills it exactly and no transparent strip shows underneath. */
+.sheet {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: #232b44;
+  border: 1px solid #3b456a;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 14px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: #7f8bae;
+  box-shadow: 0 0 0 4px rgba(127, 139, 174, 0.22);
+}
+
+.sheet[data-mood="calm"] .dot {
+  background: #46c08b;
+  box-shadow: 0 0 0 4px rgba(70, 192, 139, 0.22);
+}
+
+.sheet[data-mood="blocked"] .dot {
+  background: #f2705c;
+  box-shadow: 0 0 0 4px rgba(242, 112, 92, 0.22);
+}
+
+.verdict strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.verdict small {
+  display: block;
+  font-size: 12px;
+  color: #96a0bf;
+}
+
+.holders {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* A machine with a dozen holders must not grow a window taller than the
+     screen; past this the list scrolls inside the popover. */
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.holders:empty {
+  display: none;
+}
+
+.holders li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 7px;
+}
+
+.holders li:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.who {
+  flex: 1;
+  min-width: 0;
+}
+
+.who b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.who span {
+  display: block;
+  font-size: 11px;
+  color: #96a0bf;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.held {
+  flex: none;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #96a0bf;
+}
+
+.quit {
+  all: unset;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  line-height: 1;
+  color: #96a0bf;
+  background: rgba(255, 255, 255, 0.07);
+  cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.quit:hover {
+  background: #f2705c;
+  color: #fff;
+}
+
+/* A programmatic focus counts as :focus-visible in WKWebView, so the ring
+   flashes on the first button every time the popover opens. */
+.quit:focus {
+  outline: none;
+}
+
+.foot {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 14px 10px;
+  font-size: 11px;
+  color: #96a0bf;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
