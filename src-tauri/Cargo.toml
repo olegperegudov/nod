@@ -1,6 +1,6 @@
 [package]
 name = "nod"
-version = "0.1.0"
+version = "0.1.1"
 description = "Tells you whether the Mac will fall asleep when you walk away"
 authors = ["Oleg Peregudov"]
 edition = "2021"
