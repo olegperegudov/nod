@@ -29,10 +29,6 @@ const POLL_SECS: u64 = 30;
 /// turns out to be — the page measures itself and calls `fit_popover`.
 const POPOVER_WIDTH: f64 = 292.0;
 
-/// Shown for the instant before the page reports its real height. Close enough
-/// to the empty state that the correction is invisible.
-const POPOVER_FIRST_HEIGHT: f64 = 92.0;
-
 /// A height arriving from the page is a number from a webview, so it is bounded
 /// before it becomes a window size.
 const POPOVER_MIN_HEIGHT: f64 = 60.0;
@@ -112,6 +108,17 @@ fn get_verdict(app: AppHandle) -> Verdict {
 
 #[tauri::command]
 fn close_holder(app: AppHandle, pid: u32) -> Result<(), String> {
+    // The page names a pid, and this is the only place in the app that can end
+    // a process — so the pid is checked against what is actually holding the
+    // Mac awake right now, rather than trusted. The list is the permission:
+    // whatever the popover is showing, it may close, and nothing else. Without
+    // this, anything that got a foothold in the webview could quit any process
+    // the user owns, and the app names in that view come from other people's
+    // software.
+    if !sleep::holders().iter().any(|h| h.pid == pid) {
+        debug_log::log(&format!("quit: refused pid {} — not a current holder", pid));
+        return Err("that app is no longer holding the Mac awake".into());
+    }
     quit::ask_to_quit(pid)?;
     // The app needs a moment to put itself away before pmset stops listing it.
     let handle = app.clone();
@@ -129,11 +136,6 @@ fn fit_popover(app: AppHandle, height: f64) {
     let Some(window) = app.get_webview_window(POPOVER) else { return };
     let height = height.clamp(POPOVER_MIN_HEIGHT, POPOVER_MAX_HEIGHT);
     let _ = window.set_size(tauri::LogicalSize::new(POPOVER_WIDTH, height));
-}
-
-#[tauri::command]
-fn get_version(app: AppHandle) -> String {
-    app.package_info().version.to_string()
 }
 
 #[tauri::command]
@@ -252,13 +254,13 @@ pub fn run() {
             update_waiting: Mutex::new(false),
         })
         .invoke_handler(tauri::generate_handler![
+            // Only what the popover actually calls. The update commands are
+            // driven from the tray menu, in Rust, so exposing them to the page
+            // would widen the surface for nothing.
             get_verdict,
             close_holder,
-            get_version,
             js_log,
-            fit_popover,
-            check_for_update,
-            install_update
+            fit_popover
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

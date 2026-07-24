@@ -1,72 +1,48 @@
 <div align="center">
 
-<img src="src/nod.png" width="96" alt="Nod" />
+<img src="src/nod.png" width="88" alt="Nod" />
 
 # Nod
 
-**Will the Mac fall asleep when you walk away?**
-
-Free and open source · Reads nothing but the power state · Lives in the menu bar
+**Will the Mac fall asleep if you walk away right now?**
 
 </div>
 
-## Get it
+Sometimes a Mac quietly stops sleeping. You leave, assuming it dozed off, and
+five hours later it is flat. Nod tells you before that happens: three Z's in the
+menu bar. Green, it will sleep. Red, something is holding it.
 
-<div align="center">
+## Install
 
-### [⬇ Download for Apple Silicon](https://github.com/olegperegudov/nod/releases/latest/download/Nod_macOS_AppleSilicon.dmg) · [⬇ Download for Intel](https://github.com/olegperegudov/nod/releases/latest/download/Nod_macOS_Intel.dmg)
+**[Download for Apple Silicon](https://github.com/olegperegudov/nod/releases/latest/download/Nod_macOS_AppleSilicon.dmg)** · **[Download for Intel](https://github.com/olegperegudov/nod/releases/latest/download/Nod_macOS_Intel.dmg)**
 
-</div>
+First launch: right-click the app → **Open**. It has no Apple certificate, so
+macOS asks once. Then allow notifications — that is how Nod warns you when you
+unplug the charger.
 
-Need an older build? [All releases](https://github.com/olegperegudov/nod/releases)
+## Using it
 
-## Three steps
-
-1. **Open it.** macOS blocks unsigned apps on first launch: right-click the app → **Open**, or run
-   `xattr -dr com.apple.quarantine /Applications/Nod.app`
-2. **Allow notifications** when asked — that is how Nod warns you the moment you unplug.
-3. **Walk away.** The three Z's in the menu bar are green when the Mac will sleep and red when it won't.
-
-## It answers before you leave, not after
-
-Green means nothing is holding the machine awake: shut the lid, it sleeps.
+You don't. You glance at the colour on your way out.
 
 ![Nothing is holding it](docs/screenshots/calm.png)
 
-## Red names the app, not the machinery
-
-macOS reports that "coreaudiod" is holding the speakers. That is the audio
-service doing it *for* someone — Nod shows the app that actually took them.
+Red: click the icon to see who. The cross closes that app, the same way ⌘Q does.
 
 ![Two apps are holding it awake](docs/screenshots/blocked.png)
 
-## The cross closes the app
+On the charger the icon goes grey. A plugged-in Mac stays awake on purpose, so
+long jobs can finish — nothing to warn about.
 
-One click quits the holder the same way ⌘Q does, so it saves its work on the way
-out. The verdict goes green as soon as it lets go.
+## What's inside
 
-## Plugged in, it keeps quiet
+Nothing leaves the Mac: no account, no analytics, no network at all except the
+update check. Nothing is stored either. Nod reads what the system command
+`pmset` already prints and puts it in plain words — `pmset` names background
+services, Nod names the apps.
 
-A Mac on power is meant to stay awake so long jobs can finish. Nod says so
-instead of calling it a fault.
+macOS only. Windows has a similar command, but it needs an administrator
+prompt, which is too much for a small icon in the corner.
 
-![Not watching while plugged in](docs/screenshots/charging.png)
+When a new version is out the icon grows a green dot. Right-click → update.
 
-## Updates
-
-The Z's grow a green dot when a new version is out. Right-click the icon →
-**Update to vX.Y.Z**.
-
-## Privacy
-
-- Nothing leaves the Mac. No accounts, no analytics, no network calls except the update check.
-- Nothing is stored: no history, no settings file. The debug log records events, never what you were doing, and starts empty on every launch.
-- The only thing Nod reads is what `pmset` already prints for anyone on the machine.
-
-## Under the hood
-
-Stack, local build, tests and CI: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-
-## License
-
-MIT
+How it works inside: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). MIT licence.

@@ -34,6 +34,12 @@ its behalf.
 mapping, the notification rules, file modes) and 7 vitest (the wording). Both
 suites go red when the rule they cover is removed — checked by removing it.
 
+**Hardening:** the cross passes a pid from the page, so the pid is checked
+against the live holder list before anything is signalled — the popover may
+close what it is showing and nothing else. The page is handed only the four
+commands it calls, and the notification and updater plugins are reachable from
+Rust alone.
+
 **Verified by eye:** all three popover states photographed through the
 `_nod_shot.mjs` harness at 2×, and the menu-bar glyph inspected at its real 22pt
 size, where the first draft turned out to be an unreadable blob.
