@@ -13,7 +13,7 @@ mod sleep;
 mod watch;
 
 use tauri::menu::{MenuBuilder, MenuItem};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
@@ -231,6 +231,17 @@ fn show_popover(app: &AppHandle, icon: tauri::Rect) {
     mac_window::show_popover(app);
 }
 
+/// One press of the left button, not two events.
+///
+/// A tray click arrives twice — once as the button goes down, once as it comes
+/// back up — and both are `TrayIconEvent::Click`. Toggling on each of them
+/// opened the popover on the way down and closed it on the way up, so it lived
+/// exactly as long as the button was held. The press is the one that counts,
+/// the same instant the system's own menu-bar items open.
+fn opens_popover(button: MouseButton, state: MouseButtonState) -> bool {
+    button == MouseButton::Left && state == MouseButtonState::Down
+}
+
 fn toggle_popover(app: &AppHandle, icon: tauri::Rect) {
     if mac_window::popover_visible(app) {
         mac_window::hide_popover(app);
@@ -427,8 +438,8 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button, rect, .. } = event {
-                if button == tauri::tray::MouseButton::Left {
+            if let TrayIconEvent::Click { button, button_state, rect, .. } = event {
+                if opens_popover(button, button_state) {
                     toggle_popover(tray.app_handle(), rect);
                 }
             }
@@ -479,6 +490,24 @@ mod tests {
                 "{:?} shows the same icon with and without a pending update",
                 mood
             );
+        }
+    }
+
+    #[test]
+    fn a_click_is_one_press_not_two_events() {
+        // The release must do nothing: acting on both halves of a click toggled
+        // the popover open and shut inside one press, which read as an icon
+        // that only works while the mouse is held down.
+        assert!(opens_popover(MouseButton::Left, MouseButtonState::Down));
+        assert!(!opens_popover(MouseButton::Left, MouseButtonState::Up));
+    }
+
+    #[test]
+    fn the_right_button_belongs_to_the_menu() {
+        // Update, version and Quit live in the tray menu; a right press must
+        // not also throw the popover at the user.
+        for state in [MouseButtonState::Down, MouseButtonState::Up] {
+            assert!(!opens_popover(MouseButton::Right, state));
         }
     }
 

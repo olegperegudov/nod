@@ -4,6 +4,12 @@
 
 ### Fixed
 
+**The popover lived only while the mouse was held down.** A tray click arrives
+as two events — the press and the release — and both say "clicked". Toggling on
+each of them opened the popover on the way down and closed it on the way up, so
+letting go of the button put it away again. Only the press counts now, the same
+instant the system's own menu-bar items open.
+
 **v0.1.3 aborted the moment it launched.** The popover fix converted the window
 into an NSPanel without registering the plugin that hands panels out, so the
 first thing the app did on startup was ask for something that was not there.
