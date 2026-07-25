@@ -44,18 +44,29 @@ report:
 `coreaudiod` is resolved through its `Created for PID` line to the app that
 took the speakers. Without that the list would blame a system service.
 
+## Starting it is a test
+
+```bash
+tools/smoke.sh              # release build, the one that ships
+MODE=debug tools/smoke.sh   # faster, same check
+```
+
+Builds, launches the binary, and fails unless it is still alive six seconds
+later with `setup complete` in its log. Everything that goes wrong at launch —
+a plugin never registered, a panel converted before the plugin exists — happens
+after `cargo test` is already green, in `did_finish_launching`, where a panic
+cannot unwind and the process aborts. v0.1.3 shipped that way. CI runs this
+before the release job, so it cannot happen twice.
+
 ## Icons
 
-Two families, on purpose. The menu bar carries the three Z's — six variants
-(three states × with and without the update badge), redrawn from one shape. The
-app itself is the koala in `src/koala.png`: Dock, DMG and README, the same way
-Ribbit is a frog and Iago a parrot. Colour is a state and belongs to the Z's;
-the koala is identity and stays put.
+One shape, six menu-bar variants (three states × with and without the update
+badge) plus the master used for the Dock, the DMG and the README.
 
 ```bash
 npm i -D playwright        # not a dependency of the app
-node tools/make_icons.mjs   # the six menu-bar Z's
-npx tauri icon src/koala.png   # the app icon, from the koala master
+node tools/make_icons.mjs
+npx tauri icon src/nod.png
 ```
 
 The badge sits bottom-right rather than the usual top-right: the Z's climb

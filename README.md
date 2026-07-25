@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src/koala.png" width="96" alt="Nod" />
+<img src="src/nod.png" width="88" alt="Nod" />
 
 # Nod
 

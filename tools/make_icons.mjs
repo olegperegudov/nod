@@ -1,11 +1,7 @@
-// Redraws the six menu-bar icons from one shape: three Z's climbing away from a
+// Redraws every icon in the app from one shape: three Z's climbing away from a
 // sleeper. Run it after changing a colour or the glyph itself.
 //
 //   npm i -D playwright && node tools/make_icons.mjs
-//
-// The app icon is a different thing entirely — the koala in src/koala.png, drawn
-// by hand and fed to `tauri icon`. The Z's answer "will it sleep" and change
-// colour; the koala is who the app is, and never changes.
 //
 // Playwright is not a dependency of the app — icons are committed, and this is
 // the recipe for regenerating them, not part of the build.
@@ -14,10 +10,12 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
 
 const OUT_TRAY = "src-tauri/icons";
+const OUT_MASTER = "src";
 
-// Menu-bar states get their own colours: the icon's colour answers "will it
-// sleep", so it cannot also mean "an update is out" — that is what the badge is
-// for.
+// The family accent. Menu-bar states get their own colours: the icon's colour
+// answers "will it sleep", so it cannot also mean "an update is out" — that is
+// what the badge is for.
+const TEAL = "#39c0b3";
 const STATES = {
   calm: "#46c08b",
   blocked: "#f2705c",
@@ -67,7 +65,10 @@ function page(size, color, stroke, withBadge) {
 </svg>`;
 }
 
-const jobs = [];
+const jobs = [
+  // Master: dock, DMG, README header, profile showcase — one file, several homes.
+  { file: `${OUT_MASTER}/nod.png`, size: 1024, color: TEAL, stroke: 1.15, badge: false },
+];
 
 for (const [state, color] of Object.entries(STATES)) {
   jobs.push({ file: `${OUT_TRAY}/tray-${state}.png`, size: 44, color, stroke: 1.45, badge: false });

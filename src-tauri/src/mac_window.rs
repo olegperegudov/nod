@@ -25,6 +25,22 @@ tauri_nspanel::tauri_panel! {
     })
 }
 
+/// The plugin that hands out panels. `to_panel` looks it up through the app's
+/// state, so without this registered the first conversion panics — inside
+/// `did_finish_launching`, where a panic cannot unwind and the process aborts.
+/// It ships next to `setup_panel` so the two cannot be added apart.
+#[cfg(target_os = "macos")]
+pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    tauri_nspanel::init()
+}
+
+/// The panel is macOS-only; elsewhere the popover stays an ordinary window, and
+/// this keeps one builder chain instead of two.
+#[cfg(not(target_os = "macos"))]
+pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    tauri::plugin::Builder::new("noop").build()
+}
+
 #[cfg(target_os = "macos")]
 pub fn setup_panel(window: &tauri::WebviewWindow) -> Result<(), String> {
     use tauri_nspanel::{CollectionBehavior, StyleMask, WebviewWindowExt};

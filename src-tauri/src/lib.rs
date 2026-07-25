@@ -246,6 +246,7 @@ pub fn run() {
     debug_log::init();
 
     tauri::Builder::default()
+        .plugin(mac_window::plugin())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .manage(Watcher {

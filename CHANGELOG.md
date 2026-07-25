@@ -4,6 +4,20 @@
 
 ### Fixed
 
+**v0.1.3 aborted the moment it launched.** The popover fix converted the window
+into an NSPanel without registering the plugin that hands panels out, so the
+first thing the app did on startup was ask for something that was not there.
+That happens inside `did_finish_launching`, where a panic cannot unwind — the
+process aborted instead, which from the outside looked like an update that
+uninstalled the app. The plugin now ships in the same file as the conversion,
+so the two cannot be added apart.
+
+It compiled and every test passed, because nothing in the suite ever started the
+app. `tools/smoke.sh` does: it builds, launches the binary, and fails unless the
+process is still alive seconds later with a finished setup in its log. It runs
+in CI before anything is released, and it goes red on this exact bug — checked
+by removing the fix.
+
 **The popover now opens.** Clicking the Z's did nothing on any desktop but the
 one Nod happened to launch on, and on that one the popover flashed for half a
 second and vanished. Two causes, one shape: it was a plain window. A window
@@ -19,13 +33,6 @@ monitor instead of the focus event: it only reports clicks that land in other
 applications, so neither the cross inside the popover nor the menu-bar icon can
 dismiss the popover out from under itself. Nod also no longer takes activation
 from whatever you were working in, since nothing in the popover is typed into.
-
-### Changed
-
-**The app is a koala.** Ribbit is a frog, Iago a parrot, and Nod was three Z's
-in both places — menu bar and Dock. The Z's carry the state and change colour
-with it; identity has to sit still, so the two jobs are split. The koala sleeps
-in the Dock, the DMG and the README; the menu bar keeps the Z's.
 
 ### Added
 
