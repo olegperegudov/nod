@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src/nod.png" width="88" alt="Nod" />
+<img src="src/koala.png" width="96" alt="Nod" />
 
 # Nod
 
@@ -16,9 +16,20 @@ menu bar. Green, it will sleep. Red, something is holding it.
 
 **[Download for Apple Silicon](https://github.com/olegperegudov/nod/releases/latest/download/Nod_macOS_AppleSilicon.dmg)** · **[Download for Intel](https://github.com/olegperegudov/nod/releases/latest/download/Nod_macOS_Intel.dmg)**
 
-First launch: right-click the app → **Open**. It has no Apple certificate, so
-macOS asks once. Then allow notifications — that is how Nod warns you when you
-unplug the charger.
+Open the disk image, drag Nod into Applications. The first launch is where
+macOS gets in the way: it says it cannot verify the app and offers to put it in
+the Trash. Nothing is wrong with the file. Apple vouches only for developers who
+pay it $99 a year; this app is free, so it gets the scary dialog instead.
+
+![macOS blocks the first launch](docs/screenshots/gatekeeper-blocked.png)
+
+Press **Done** — never *Move to Trash*. Then open **System Settings → Privacy &
+Security**, scroll to *Security*, and press **Open Anyway**.
+
+![Open Anyway, in Privacy & Security](docs/screenshots/gatekeeper-allow.png)
+
+That is once per app, not per version — updates after that install themselves.
+Then allow notifications: that is how Nod warns you when you unplug the charger.
 
 ## Using it
 

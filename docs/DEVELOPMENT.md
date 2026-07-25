@@ -46,13 +46,16 @@ took the speakers. Without that the list would blame a system service.
 
 ## Icons
 
-One shape, six menu-bar variants (three states × with and without the update
-badge) plus the master used for the Dock, the DMG and the README.
+Two families, on purpose. The menu bar carries the three Z's — six variants
+(three states × with and without the update badge), redrawn from one shape. The
+app itself is the koala in `src/koala.png`: Dock, DMG and README, the same way
+Ribbit is a frog and Iago a parrot. Colour is a state and belongs to the Z's;
+the koala is identity and stays put.
 
 ```bash
 npm i -D playwright        # not a dependency of the app
-node tools/make_icons.mjs
-npx tauri icon src/nod.png
+node tools/make_icons.mjs   # the six menu-bar Z's
+npx tauri icon src/koala.png   # the app icon, from the koala master
 ```
 
 The badge sits bottom-right rather than the usual top-right: the Z's climb

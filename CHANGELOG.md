@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Fixed
+
+**The popover now opens.** Clicking the Z's did nothing on any desktop but the
+one Nod happened to launch on, and on that one the popover flashed for half a
+second and vanished. Two causes, one shape: it was a plain window. A window
+belongs to the Space it was born on, so on every other desktop it was opening
+out of sight; and Nod is an accessory app with no Dock icon, so it never really
+took focus — macOS reported the focus lost a moment later, and the handler that
+closes the popover when you click away closed it instead.
+
+It is now a non-activating NSPanel, joined to all Spaces and told that being
+deactivated is not a reason to hide — the mechanism Spotlight uses, and the one
+Iago already runs for its own popup. Clicking away is caught by a global mouse
+monitor instead of the focus event: it only reports clicks that land in other
+applications, so neither the cross inside the popover nor the menu-bar icon can
+dismiss the popover out from under itself. Nod also no longer takes activation
+from whatever you were working in, since nothing in the popover is typed into.
+
+### Changed
+
+**The app is a koala.** Ribbit is a frog, Iago a parrot, and Nod was three Z's
+in both places — menu bar and Dock. The Z's carry the state and change colour
+with it; identity has to sit still, so the two jobs are split. The koala sleeps
+in the Dock, the DMG and the README; the menu bar keeps the Z's.
+
 ### Added
 
 **Nod, first version.** A Mac that quietly refuses to sleep costs a battery: you

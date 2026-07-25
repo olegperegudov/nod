@@ -6,6 +6,7 @@
 //! this file is the wiring: tray, popover, polling, updates.
 
 mod debug_log;
+mod mac_window;
 mod private;
 mod quit;
 mod sleep;
@@ -227,14 +228,12 @@ fn show_popover(app: &AppHandle, icon: tauri::Rect) {
         let _ = window.set_position(tauri::LogicalPosition::new(x, y));
     }
 
-    let _ = window.show();
-    let _ = window.set_focus();
+    mac_window::show_popover(app);
 }
 
 fn toggle_popover(app: &AppHandle, icon: tauri::Rect) {
-    let Some(window) = app.get_webview_window(POPOVER) else { return };
-    if window.is_visible().unwrap_or(false) {
-        let _ = window.hide();
+    if mac_window::popover_visible(app) {
+        mac_window::hide_popover(app);
         return;
     }
     let verdict = look(watch::SETTLED_SECS);
@@ -271,6 +270,16 @@ pub fn run() {
 
             build_tray(app)?;
 
+            // Before anything shows it: the popover only behaves — appears on
+            // the Space in front of the user, stays up while another app is
+            // active — once it is an NSPanel rather than a window.
+            if let Some(window) = handle.get_webview_window(POPOVER) {
+                if let Err(e) = mac_window::setup_panel(&window) {
+                    debug_log::log(&format!("panel: setup failed: {}", e));
+                }
+            }
+            mac_window::dismiss_on_outside_click(handle.clone());
+
             let poll = handle.clone();
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -305,9 +314,13 @@ pub fn run() {
         .on_window_event(|window, event| {
             // Clicking away puts the popover down, the way a menu closes. It is
             // hidden, never destroyed — the tray icon opens the same window
-            // every time.
+            // every time. On macOS the click is caught by the NSEvent monitor in
+            // `mac_window` instead: the panel is never the active app, so losing
+            // focus there means nothing and hiding on it made the popover blink
+            // out the instant it appeared.
             if window.label() == POPOVER {
                 match event {
+                    #[cfg(not(target_os = "macos"))]
                     tauri::WindowEvent::Focused(false) => {
                         let _ = window.hide();
                     }

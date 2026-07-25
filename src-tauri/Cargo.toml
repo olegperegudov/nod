@@ -25,6 +25,17 @@ chrono = "0.4"
 dirs = "6"
 tokio = { version = "1", features = ["time"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Turns the popover into a non-activating NSPanel: it shows on whatever Space is
+# in front of the user and stays up while another app is active. A plain window
+# does neither — see mac_window.rs.
+tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
+# NSEvent's global monitor takes an Objective-C block and nothing else — that is
+# how the popover notices a click landing outside itself.
+cocoa = "0.26"
+objc = "0.2"
+block = "0.1"
+
 [target.'cfg(unix)'.dependencies]
 # Quitting a holder is a SIGTERM to its pid — the same signal Cmd+Q sends, so
 # the app closes its documents instead of dying. No AppleScript, and therefore
