@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+Every part the app is built from is now locked to an exact, checked version, so
+a build can never pick up a newer one on its own.
+
 ### Fixed
 
 **The popover lived only while the mouse was held down.** A tray click arrives

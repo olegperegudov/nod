@@ -4,7 +4,7 @@ Tauri 2: Rust around the edges, plain HTML/CSS/JS inside. No framework, no
 bundler — `frontendDist` points straight at `src/`.
 
 ```bash
-npm install
+npm ci
 npm test                      # frontend logic (vitest)
 cd src-tauri && cargo test --lib
 npm run tauri dev
