@@ -132,7 +132,9 @@ jobs:
         # Absolute path — macos-latest has a `cargo` shim earlier in PATH that
         # ignores rustup syntax; dtolnay installs the real cargo here.
         shell: bash
-        run: "$HOME/.cargo/bin/cargo test --lib --locked"
+        # macos-26 ships rustup from Homebrew, so ~/.cargo/bin is empty; ask rustup
+        # for the cargo of the toolchain rust-toolchain.toml pins.
+        run: '"$(rustup which cargo)" test --lib --locked'
 
       # Starting the app is its own test. Everything that goes wrong at launch —
       # a plugin never registered, a panel converted before the plugin exists —
@@ -142,7 +144,7 @@ jobs:
       - name: Smoke test — the app actually starts
         shell: bash
         # Same cargo shim problem as the step above: the real one is in ~/.cargo.
-        run: PATH="$HOME/.cargo/bin:$PATH" MODE=debug tools/smoke.sh
+        run: 'PATH="$(dirname "$(rustup which cargo)"):$PATH" MODE=debug tools/smoke.sh'
 
       # A self-signed cert only counts as a *valid* codesigning identity once its
       # root is trusted. Until then `security find-identity -v -p codesigning`
